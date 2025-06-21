@@ -1,0 +1,179 @@
+/* 全局样式 */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f4f7f9;
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 2rem 3rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 800px;
+    text-align: center;
+}
+
+header h1 {
+    color: #0056b3;
+    margin-bottom: 0.5rem;
+}
+
+header p {
+    color: #666;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+/* 按钮样式 */
+.btn {
+    display: inline-block;
+    background-color: #007bff;
+    color: #fff;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #0056b3;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* 表单样式 */
+.form-group {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+.job-select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+}
+
+/* 面试页面特定样式 */
+.interview-container .video-section {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 2rem;
+}
+
+.interviewer-view, .candidate-view {
+    flex: 1;
+    background-color: #e9ecef;
+    border-radius: 8px;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.question-box {
+    padding: 20px;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+#user-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none; /* 初始隐藏 */
+}
+
+.video-placeholder {
+    color: #666;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 1rem;
+}
+
+.status-message {
+    color: #888;
+    font-style: italic;
+}
+
+/* 结果页面样式 */
+.result-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.result-card h2 {
+    margin-top: 0;
+    color: #0056b3;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.score {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.suggestions, .result-card ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.suggestions li, .result-card ul li {
+    background: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%2328a745" class="bi bi-check-circle" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/></svg>') no-repeat left center;
+    background-size: 20px;
+    padding-left: 30px;
+    margin-bottom: 0.75rem;
+}
+
+.transcript {
+    white-space: pre-wrap;
+    background: #e9ecef;
+    padding: 1rem;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+footer {
+    margin-top: 2rem;
+    color: #999;
+    font-size: 0.9rem;
+}

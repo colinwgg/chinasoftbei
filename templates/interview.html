@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在面试 - {{ job_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container interview-container">
+        <header>
+            <h1>正在进行【{{ job_title }}】岗位面试</h1>
+        </header>
+        <main>
+            <div class="video-section">
+                <div class="interviewer-view">
+                    <div class="question-box" id="question-box">
+                        面试官AI正在思考中...
+                    </div>
+                </div>
+                <div class="candidate-view">
+                    <video id="user-video" autoplay muted playsinline></video>
+                    <div class="video-placeholder">您的影像</div>
+                </div>
+            </div>
+            <div class="controls">
+                <button id="start-btn" class="btn">开始/下一题</button>
+                <button id="stop-btn" class="btn btn-danger">结束面试</button>
+            </div>
+            <div id="status" class="status-message">状态：请点击“开始”按钮授权摄像头和麦克风</div>
+        </main>
+    </div>
+    <!-- 引入JavaScript -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

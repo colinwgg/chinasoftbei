@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能模拟面试 - 选择岗位</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>多模态智能模拟面试评测</h1>
+            <p>请选择您要模拟面试的岗位</p>
+        </header>
+        <main>
+            <form action="/interview" method="get">
+                <div class="form-group">
+                    <label for="job-select">选择岗位:</label>
+                    <select id="job-select" name="job" class="job-select">
+                        <option value="软件开发工程师">软件开发工程师</option>
+                        <option value="产品经理">产品经理</option>
+                        <option value="数据分析师">数据分析师</option>
+                        <option value="市场专员">市场专员</option>
+                        <option value="通用岗位">通用岗位</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">开始面试</button>
+            </form>
+        </main>
+        <footer>
+            <p>© 2024 智能面试开发团队</p>
+        </footer>
+    </div>
+</body>
+</html>
