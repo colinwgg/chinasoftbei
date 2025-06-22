@@ -1,50 +1,30 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>面试评估报告</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <title>AI 面试报告</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <div class="container result-container">
-        <header>
-            <h1>您的面试评估报告</h1>
-        </header>
-        <main>
-            <div class="result-card">
-                <h2>综合得分</h2>
-                <p class="score">{{ data.overall_score }} / 100</p>
-            </div>
+<body class="bg-light">
+<div class="container py-5">
+  <h2 class="mb-4">AI 面试报告</h2>
+  <p>平均得分：<strong>{{ average_score }}</strong> 分</p>
+  <hr>
 
-            <div class="result-card">
-                <h2>分项评估</h2>
-                <ul>
-                    <li>语言表达清晰度: <span class="score">{{ data.clarity_score }}</span></li>
-                    <li>回答内容相关性: <span class="score">{{ data.relevance_score }}</span></li>
-                    <li>自信心与仪态: <span class="score">{{ data.confidence_score }}</span></li>
-                </ul>
-            </div>
-
-            <div class="result-card">
-                <h2>AI建议</h2>
-                <ul class="suggestions">
-                    {% for suggestion in data.suggestions %}
-                        <li>{{ suggestion }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-
-            <div class="result-card">
-                <h2>面试对话记录 (摘要)</h2>
-                <pre class="transcript">{{ data.transcript }}</pre>
-            </div>
-
-            <a href="/" class="btn">返回首页，再试一次</a>
-        </main>
-        <footer>
-            <p>© 2024 智能面试开发团队</p>
-        </footer>
+  {% for res in results %}
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">问题 {{ loop.index }}：</h5>
+      <p><strong>题目：</strong>{{ res.question }}</p>
+      <p><strong>你的回答：</strong>{{ res.answer }}</p>
+      <p><strong>AI 评分：</strong>{{ res.evaluation.score }}</p>
+      <p><strong>优点：</strong>{{ res.evaluation.strengths }}</p>
+      <p><strong>改进建议：</strong>{{ res.evaluation.weaknesses }}</p>
     </div>
+  </div>
+  {% endfor %}
+
+  <a href="/" class="btn btn-secondary">返回首页</a>
+</div>
 </body>
 </html>
