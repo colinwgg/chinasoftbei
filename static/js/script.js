@@ -1,135 +1,121 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // 获取页面元素
+    const videoElement = document.getElementById('user-video');
     const startBtn = document.getElementById('start-btn');
     const stopBtn = document.getElementById('stop-btn');
     const questionBox = document.getElementById('question-box');
     const statusEl = document.getElementById('status');
-    const videoElement = document.getElementById('user-video');
+    const videoPlaceholder = document.querySelector('.video-placeholder'); // 获取占位符元素
 
-    let recorder;
-    let audioContext;
-    let stream;
+    let mediaRecorder;
+    let recordedChunks = [];
     let questionCounter = 0;
-    let currentQuestion = '';
-    let isUploading = false;
 
-    const questions = [
-        "你好，请先用30秒做个简单的自我介绍。",
-        "你为什么对我们公司和这个岗位感兴趣？",
-        "请分享一个你遇到的最大挑战以及你是如何解决的。",
-        "你对未来3-5年有什么职业规划？",
-        "最后，你有什么问题想问我们吗？"
-    ];
+    const questionsElement = document.getElementById('questions-data');
+    const questions = JSON.parse(questionsElement.textContent);
 
+    // 初始化摄像头和麦克风
     async function initMedia() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+            // <<< 这是最关键的一行代码！
+            // 将获取到的媒体流（包含视频和音频）赋值给 video 元素的 srcObject 属性。
+            // 这样浏览器就会在 <video> 标签内播放摄像头的实时画面。
             videoElement.srcObject = stream;
 
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const input = audioContext.createMediaStreamSource(stream);
+            videoElement.style.display = 'block';
+            videoPlaceholder.style.display = 'none';
 
-            recorder = new Recorder(input, { numChannels: 1 });
+            mediaRecorder = new MediaRecorder(stream);
 
-            statusEl.textContent = '状态：设备就绪，点击“开始提问”以开始面试。';
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const fullBlob = new Blob(recordedChunks, { type: 'audio/mp3' });
+                uploadFullRecording(fullBlob);
+            };
+
+            statusEl.textContent = '状态：设备就绪，点击“开始面试”以提问并开始录制。';
             startBtn.disabled = false;
-        } catch (err) {
-            console.error('媒体初始化失败:', err);
-            statusEl.textContent = '错误：无法访问麦克风或摄像头，请检查权限设置。';
-            startBtn.disabled = true;
+        } catch (error) {
+            statusEl.textContent = '错误：无法访问摄像头或麦克风，请检查浏览器权限。';
+            console.error('getUserMedia 错误:', error);
         }
     }
 
-    function startQuestion() {
-        if (questionCounter >= questions.length || isUploading) return;
+    // “开始面试/下一题”按钮的逻辑
+    function handleQuestionFlow() {
+        if (mediaRecorder.state !== 'recording') {
+            recordedChunks = [];
+            mediaRecorder.start();
+            statusEl.textContent = '录制已开始...';
+            startBtn.textContent = '下一题';
+            stopBtn.style.display = 'inline-block';
+        }
 
-        currentQuestion = questions[questionCounter];
-        questionBox.textContent = currentQuestion;
+        if (questionCounter < questions.length) {
+            questionBox.textContent = questions[questionCounter];
+            questionCounter++;
+        }
 
-        recorder.clear();
-        recorder.record();
-
-        statusEl.textContent = `正在录制第 ${questionCounter + 1} 题，请开始作答...`;
-        startBtn.textContent = '回答完毕';
-        stopBtn.style.display = 'inline-block';
+        if (questionCounter >= questions.length) {
+            startBtn.textContent = '所有问题已问完';
+            startBtn.disabled = true;
+            statusEl.textContent = '所有问题已问完，请点击“结束面试”以完成并上传录音。';
+        }
+    }
+    
+    // 结束面试并停止录制
+    function finishInterview() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            statusEl.textContent = '正在处理并上传完整录音，请稍候...';
+            startBtn.disabled = true;
+            stopBtn.disabled = true;
+            mediaRecorder.stop();
+        }
     }
 
-    function stopQuestion() {
-        recorder.stop();
-
-        statusEl.textContent = '正在处理您的回答，请稍候...';
-        startBtn.disabled = true;
-        isUploading = true;
-
-        recorder.exportWAV(blob => {
-            uploadAudio(blob, currentQuestion);
-        });
-    }
-
-    function endInterview() {
-        statusEl.textContent = '面试结束，正在跳转到结果页面...';
-        startBtn.disabled = true;
-        stopBtn.disabled = true;
-
-        setTimeout(() => {
-            window.location.href = "/result";
-        }, 3000);
-    }
-
-    function uploadAudio(blob, question) {
+    // 上传完整的录音文件
+    function uploadFullRecording(blob) {
         const formData = new FormData();
-        formData.append('audio', blob, 'interview.wav');
-        formData.append('question', question);
+        formData.append('full_audio', blob, 'full_interview.mp3');
 
-        fetch('/api/process_answer', {
+        fetch('/api/upload_full_interview', {
             method: 'POST',
             body: formData
         })
-        .then(res => res.json())
+        .then(response => response.json())
         .then(data => {
-            isUploading = false;
-            startBtn.disabled = false;
-
             if (data.status === 'success') {
-                statusEl.textContent = `第 ${questionCounter + 1} 题处理完成。`;
-                questionCounter++;
-
-                if (questionCounter >= questions.length) {
-                    startBtn.textContent = '查看报告';
-                } else {
-                    startBtn.textContent = '下一题';
-                }
+                statusEl.textContent = '上传成功！正在跳转到结果页面...';
+                window.location.href = data.redirect_url;
             } else {
-                statusEl.textContent = `识别失败：${data.message}`;
-                startBtn.textContent = '重试本题';
+                statusEl.textContent = `上传失败: ${data.message}`;
+                startBtn.disabled = false;
+                stopBtn.disabled = false;
             }
         })
-        .catch(err => {
-            console.error('上传失败:', err);
+        .catch(error => {
+            console.error('上传失败:', error);
             statusEl.textContent = '上传失败，请检查网络连接。';
-            isUploading = false;
-            startBtn.disabled = false;
-            startBtn.textContent = '重试本题';
         });
     }
 
+    // --- 事件绑定 ---
+    initMedia();
+
     if (startBtn) {
-        startBtn.disabled = true;
-        initMedia();
-
-        startBtn.addEventListener('click', () => {
-            if (isUploading) return;
-
-            if (questionCounter >= questions.length) {
-                endInterview();
-            } else if (recorder && recorder.recording) {
-                stopQuestion();
-            } else {
-                startQuestion();
-            }
-        });
+        startBtn.textContent = '开始面试';
+        startBtn.addEventListener('click', handleQuestionFlow);
     }
 
     if (stopBtn) {
-        stopBtn.addEventListener('click', endInterview);
+        stopBtn.style.display = 'none';
+        stopBtn.addEventListener('click', finishInterview);
     }
 });

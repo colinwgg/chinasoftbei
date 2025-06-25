@@ -94,7 +94,7 @@ class RequestApi(object):
 # 输入讯飞开放平台的appid，secret_key和待转写的文件路径
 if __name__ == '__main__':
     api = RequestApi(appid="777b23bb",
-                     secret_key="xxxxx",
-                     upload_file_path=r"audio/lfasr_涉政.wav")
+                     secret_key="b1f7053fc49faebf828a76f317423cd7",
+                     upload_file_path=r"recordings/软件开发工程师_1750858413.mp3")
 
     api.get_result()

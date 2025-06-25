@@ -1,104 +1,41 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <title>AI 面试中</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/recorder-js@1.0.3/dist/recorder.min.js"></script>
-  <script defer src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正在面试 - {{ job_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="bg-light">
-  <div class="container py-5">
-    <h2 class="mb-4">岗位：{{ job_title }}</h2>
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title">面试问题</h5>
-        <p id="question" class="card-text">请点击按钮开始录音。</p>
-
-        <button id="startBtn" class="btn btn-success">🎤 开始录音</button>
-        <button id="stopBtn" class="btn btn-danger" disabled>⏹️ 停止并上传</button>
-        <p class="mt-3" id="status">状态：等待开始</p>
-      </div>
+<body>
+    <div class="container interview-container">
+        <header>
+            <h1>正在进行【{{ job_title }}】岗位面试</h1>
+        </header>
+        <main>
+            <div class="video-section">
+                <div class="interviewer-view">
+                    <div class="question-box" id="question-box">
+                        请点击下方的“开始面试”按钮
+                    </div>
+                </div>
+                <div class="candidate-view">
+                    <video id="user-video" autoplay muted playsinline></video>
+                    <div class="video-placeholder">您的影像</div>
+                </div>
+            </div>
+            <div class="controls">
+                <!-- 修改了按钮的初始文本以符合新流程 -->
+                <button id="start-btn" class="btn">开始面试</button>
+                <button id="stop-btn" class="btn btn-danger">结束面试</button>
+            </div>
+            <div id="status" class="status-message">状态：请点击“开始面试”按钮以授权并开始录制。</div>
+        </main>
     </div>
-
-    <div class="mt-5">
-      <button id="nextBtn" class="btn btn-primary" disabled>下一题</button>
-    </div>
-  </div>
-
-<script>
-let mediaRecorder;
-let audioChunks = [];
-let currentQuestionIndex = 0;
-const questions = [
-  "请简要介绍一下你自己。",
-  "你为什么选择申请这个岗位？",
-  "你遇到过最大的挑战是什么？",
-  "你如何处理与同事的分歧？",
-  "未来五年你的职业规划是？"
-];
-
-const questionEl = document.getElementById("question");
-const statusEl = document.getElementById("status");
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
-const nextBtn = document.getElementById("nextBtn");
-
-function loadQuestion() {
-  if (currentQuestionIndex < questions.length) {
-    questionEl.textContent = questions[currentQuestionIndex];
-  } else {
-    window.location.href = '/result';
-  }
-}
-
-startBtn.onclick = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  mediaRecorder = new MediaRecorder(stream);
-  audioChunks = [];
-
-  mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
-  mediaRecorder.onstop = async () => {
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-    const formData = new FormData();
-    formData.append('audio', audioBlob, 'answer.webm');
-    formData.append('question', questions[currentQuestionIndex]);
-
-    statusEl.textContent = "上传中...";
-    const res = await fetch('/api/process_answer', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      statusEl.textContent = "上传成功，AI 已完成分析。";
-      nextBtn.disabled = false;
-    } else {
-      statusEl.textContent = "出错啦: " + data.message;
-    }
-  };
-
-  mediaRecorder.start();
-  statusEl.textContent = "录音中...";
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-};
-
-stopBtn.onclick = () => {
-  mediaRecorder.stop();
-  statusEl.textContent = "录音停止，准备上传...";
-  stopBtn.disabled = true;
-};
-
-nextBtn.onclick = () => {
-  currentQuestionIndex++;
-  nextBtn.disabled = true;
-  startBtn.disabled = false;
-  loadQuestion();
-};
-
-loadQuestion();
-</script>
+    <script id="questions-data" type="application/json">
+        {{ questions | tojson | safe }}
+    </script>
+    
+    <!-- 引入JavaScript -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
