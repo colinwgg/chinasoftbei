@@ -2,21 +2,22 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>面试完成 - 报告</title>
+    <title>面试完成 - 详细报告</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- 如果要绘制雷达图，可能需要引入 Chart.js 等库 -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
 </head>
 <body>
     <div class="container result-container">
         <header>
-            <h1>面试已完成</h1>
-            <p>您的面试录音和转写报告已生成。</p>
+            <h1>面试评估详细报告</h1>
+            <p>您的面试录音已完成转写和AI评估。</p>
         </header>
         <main>
             <div class="result-card">
                 <h3>岗位：{{ job_title }}</h3>
                 <p><strong>完整面试录音:</strong></p>
                 <audio controls controlsList="nodownload" style="width: 100%;">
-                    <!-- 注意：这里 src 仍然指向 static/recordings 目录下的MP3文件 -->
                     <source src="{{ url_for('static', filename='recordings/' + recording_path.split('/')[-1]) }}" type="audio/mpeg">
                     您的浏览器不支持音频播放。
                 </audio>
@@ -26,16 +27,79 @@
                 <div class="transcript-box" style="background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 1rem; border-radius: 8px; max-height: 250px; overflow-y: auto; text-align: left;">
                     <pre>{{ transcribed_text }}</pre>
                 </div>
-                
-                <hr style="margin: 1.5rem 0;">
-                <h4>后续步骤:</h4>
-                <p>您现在可以对上述转写文本进行进一步的AI分析（例如使用讯飞星火大模型进行面试评估）。</p>
             </div>
+
+            <!-- 星火大模型评估结果展示 -->
+            {% if llm_evaluation and llm_evaluation.status != 'error' and llm_evaluation.status != 'warning' %}
+            <div class="result-card">
+                <h2>AI面试评估</h2>
+                <p><strong>综合评分:</strong> <span class="score">{{ llm_evaluation.overall_score }} / 100</span></p>
+
+                <h4>核心能力指标:</h4>
+                <ul class="score-list">
+                    {% for competency, score in llm_evaluation.competencies.items() %}
+                        <li>{{ competency }}: <span class="score">{{ score }}</span></li>
+                    {% endfor %}
+                </ul>
+                <!-- 雷达图的 Canvas 元素，前端JS需要在这里绘制 -->
+                <!-- <canvas id="radarChart" width="400" height="400"></canvas> -->
+
+                <h4>优点总结:</h4>
+                <p>{{ llm_evaluation.summary_strengths }}</p>
+
+                <h4>改进建议:</h4>
+                <ul class="suggestions">
+                    {% for suggestion in llm_evaluation.specific_suggestions %}
+                        <li>{{ suggestion }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% elif llm_evaluation %}
+            <div class="result-card">
+                <h2>AI面试评估</h2>
+                <p style="color: red;"><strong>AI评估失败或未执行：</strong> {{ llm_evaluation.message }}</p>
+            </div>
+            {% endif %}
+
             <a href="/" class="btn">返回首页，重新开始</a>
         </main>
         <footer>
             <p>© 2024 智能面试开发团队</p>
         </footer>
     </div>
+
+    <!-- 前端绘制雷达图的示例脚本 (需要 Chart.js) -->
+    <!-- 
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const llmEvaluation = {{ llm_evaluation | tojson | safe }};
+            if (llmEvaluation && llmEvaluation.radar_chart_data) {
+                const ctx = document.getElementById('radarChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: llmEvaluation.radar_chart_data.labels,
+                        datasets: [{
+                            label: '你的能力评分',
+                            data: llmEvaluation.radar_chart_data.values,
+                            backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                            borderColor: 'rgba(0, 123, 255, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            r: {
+                                angleLines: { display: false },
+                                suggestedMin: 0,
+                                suggestedMax: 100
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+    -->
 </body>
 </html>
