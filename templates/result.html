@@ -2,31 +2,22 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>面试完成 - 详细报告</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- 如果要绘制雷达图，可能需要引入 Chart.js 等库 -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
+    <!-- 引入 Chart.js 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container result-container">
         <header>
             <h1>面试评估详细报告</h1>
-            <p>您的面试录音已完成转写和AI评估。</p>
+            <p>您的面试录音已完成AI评估。</p>
         </header>
         <main>
+            <!-- 岗位信息保留 -->
             <div class="result-card">
                 <h3>岗位：{{ job_title }}</h3>
-                <p><strong>完整面试录音:</strong></p>
-                <audio controls controlsList="nodownload" style="width: 100%;">
-                    <source src="{{ url_for('static', filename='recordings/' + recording_path.split('/')[-1]) }}" type="audio/mpeg">
-                    您的浏览器不支持音频播放。
-                </audio>
-                <hr style="margin: 1.5rem 0;">
-                
-                <h4>转写结果:</h4>
-                <div class="transcript-box" style="background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 1rem; border-radius: 8px; max-height: 250px; overflow-y: auto; text-align: left;">
-                    <pre>{{ transcribed_text }}</pre>
-                </div>
             </div>
 
             <!-- 星火大模型评估结果展示 -->
@@ -41,8 +32,11 @@
                         <li>{{ competency }}: <span class="score">{{ score }}</span></li>
                     {% endfor %}
                 </ul>
-                <!-- 雷达图的 Canvas 元素，前端JS需要在这里绘制 -->
-                <!-- <canvas id="radarChart" width="400" height="400"></canvas> -->
+
+                <!-- 雷达图的容器和 Canvas 元素 -->
+                <div class="chart-container" style="position: relative; height:400px; width:400px; margin: 20px auto;">
+                    <canvas id="radarChart"></canvas>
+                </div>
 
                 <h4>优点总结:</h4>
                 <p>{{ llm_evaluation.summary_strengths }}</p>
@@ -68,38 +62,78 @@
         </footer>
     </div>
 
-    <!-- 前端绘制雷达图的示例脚本 (需要 Chart.js) -->
-    <!-- 
+    <!-- 绘制雷达图的 JavaScript 代码 -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const llmEvaluation = {{ llm_evaluation | tojson | safe }};
-            if (llmEvaluation && llmEvaluation.radar_chart_data) {
-                const ctx = document.getElementById('radarChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'radar',
-                    data: {
-                        labels: llmEvaluation.radar_chart_data.labels,
-                        datasets: [{
-                            label: '你的能力评分',
-                            data: llmEvaluation.radar_chart_data.values,
-                            backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                            borderColor: 'rgba(0, 123, 255, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        scales: {
-                            r: {
-                                angleLines: { display: false },
-                                suggestedMin: 0,
-                                suggestedMax: 100
+
+            if (llmEvaluation && llmEvaluation.radar_chart_data && 
+                Array.isArray(llmEvaluation.radar_chart_data.labels) && 
+                Array.isArray(llmEvaluation.radar_chart_data.values) &&
+                llmEvaluation.radar_chart_data.labels.length > 0 &&
+                llmEvaluation.radar_chart_data.labels.length === llmEvaluation.radar_chart_data.values.length) {
+                
+                const ctx = document.getElementById('radarChart'); 
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: 'radar', 
+                        data: {
+                            labels: llmEvaluation.radar_chart_data.labels, 
+                            datasets: [{
+                                label: '能力评分', 
+                                data: llmEvaluation.radar_chart_data.values, 
+                                backgroundColor: 'rgba(0, 123, 255, 0.2)', 
+                                borderColor: 'rgba(0, 123, 255, 1)', 
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true, 
+                            maintainAspectRatio: false, 
+                            scales: {
+                                r: {
+                                    angleLines: { display: false }, 
+                                    suggestedMin: 0,   
+                                    suggestedMax: 100, 
+                                    pointLabels: {
+                                        font: {
+                                            size: 14 
+                                        }
+                                    },
+                                    ticks: {
+                                        stepSize: 20, 
+                                        backdropColor: 'rgba(255, 255, 255, 0.75)', 
+                                        callback: function(value, index, values) {
+                                            return value; 
+                                        }
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true, 
+                                    position: 'top' 
+                                },
+                                title: {
+                                    display: true,
+                                    text: '面试表现雷达图', 
+                                    font: {
+                                        size: 18
+                                    }
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
+            } else {
+                const chartContainer = document.querySelector('.chart-container');
+                if(chartContainer) {
+                    chartContainer.innerHTML = "<p style='color: #666; text-align: center; padding-top: 50px;'>暂无雷达图数据或数据格式不正确，请检查AI评估结果。</p>";
+                    chartContainer.style.height = '150px';
+                }
+                console.warn("无法绘制雷达图：llm_evaluation.radar_chart_data 数据无效或缺失。", llmEvaluation);
             }
         });
     </script>
-    -->
 </body>
 </html>
