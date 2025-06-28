@@ -15,6 +15,8 @@ from datetime import datetime # 导入 datetime 类
 from time import mktime # 导入 mktime 函数
 from pydub import AudioSegment # 确保已安装 pydub
 import websocket # 确保已安装 websocket-client
+from pdfminer.high_level import extract_text
+from werkzeug.utils import secure_filename
 
 # =====================================================================================
 # 1. FLASK 应用设置
@@ -26,6 +28,7 @@ app.secret_key = 'a_different_secret_key_for_this_approach' # 请确保设置一
 # 定义录音文件和转写结果文件的存储目录
 RECORDINGS_DIR = 'static/recordings' # 录音文件存放处 (Flask可以直接访问)
 ANSWERS_DIR = 'answers' # 转写结果文本文件存放处 (服务器内部使用)
+UPLOAD_TEMP_DIR = 'temp_uploads'
 
 if not os.path.exists(RECORDINGS_DIR):
     os.makedirs(RECORDINGS_DIR)
@@ -33,9 +36,8 @@ if not os.path.exists(ANSWERS_DIR):
     os.makedirs(ANSWERS_DIR)
 
 # =====================================================================================
-# 2. 讯飞 API 密钥配置 (从环境变量加载，优先级最高)
+# 2. 讯飞 API 密钥配置
 # =====================================================================================
-# 建议在运行前通过 export LFASR_APPID="..." SPARK_APPID="..." 等命令设置
 LFASR_APPID = os.environ.get("LFASR_APPID", "777b23bb")
 LFASR_SECRET_KEY = os.environ.get("LFASR_SECRET_KEY", "b1f7053fc49faebf828a76f317423cd7")
 
@@ -44,11 +46,11 @@ SPARK_API_KEY = os.environ.get("SPARK_API_KEY", "f1935f643ee6f8de9ad503940e8497d
 SPARK_API_SECRET = os.environ.get("SPARK_API_SECRET", "ZGIxOGFiNjBjNjBkYjZiMmUyYTIwYTM1")
 
 # 星火大模型服务地址和领域
-SPARK_URL = "wss://spark-api.xf-yun.com/v1/x1"  # 对应您案例中的 v1.x 版本
-SPARK_DOMAIN = "x1" # 对应您案例中的 domain
+SPARK_URL = "wss://spark-api.xf-yun.com/v1/x1" 
+SPARK_DOMAIN = "x1" 
 
 # =====================================================================================
-# 3. 讯飞长语音转写 API 客户端 (基于您提供的模板)
+# 3. 讯飞长语音转写 API 客户端
 # =====================================================================================
 lfasr_host = 'https://raasr.xfyun.cn/v2/api'
 api_upload = '/upload'
@@ -84,8 +86,6 @@ class LongAudioRequestApi(object): # 重命名类名，避免与Flask的request�
         param_dict['ts'] = self.ts
         param_dict["fileSize"] = file_len
         param_dict["fileName"] = file_name
-        # duration 参数根据文档是可选的，如果知道时长可以提供，不知道则省略
-        # 这里设置为 '0' 允许讯飞自动识别时长
         param_dict["duration"] = "0" # 设置为0让讯飞自动识别时长
         
         print("upload参数：", param_dict)
@@ -100,8 +100,6 @@ class LongAudioRequestApi(object): # 重命名类名，避免与Flask的request�
         if result['code'] != '000000':
             raise Exception(f"长语音上传失败: {result.get('descInfo', '未知错误')}")
         return result
-
-    # 在 app.py 中找到 LongAudioRequestApi 类的 get_result 函数并替换它
 
     def get_result(self):
         try:
@@ -155,7 +153,7 @@ class LongAudioRequestApi(object): # 重命名类名，避免与Flask的request�
             return {"code": "ERROR", "descInfo": str(e), "content": {"orderInfo": {"status": -99, "failType": 0}, "orderResult": ""}} # 返回一个包含错误信息的结构，避免后续代码崩溃
 
 # =====================================================================================
-# 4. 讯飞星火大模型 API 客户端 (基于您最新的模板，重构为同步类)
+# 4. 讯飞星火大模型 API 客户端
 # =====================================================================================
 
 class SparkLLMClient:
@@ -241,6 +239,18 @@ class SparkLLMClient:
         if not self._is_finished.is_set(): # 如果是意外关闭，也设置信号量
             self._error_message = "星火大模型WebSocket意外关闭。"
             self._is_finished.set()
+            
+    def get_json_response(self, prompt_text, timeout=60):
+        """
+        向星火大模型发送请求，并尝试解析返回的JSON字符串。
+        用于生成问题等场景。
+        """
+        messages = [{"role": "user", "content": prompt_text}]
+        json_str = self._run_websocket_request(messages, timeout)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise Exception(f"解析星火大模型返回的JSON失败: {e}. 原始文本: {json_str}")
 
     def get_evaluation(self, question_text, interview_questions_list):
         """
@@ -338,6 +348,86 @@ class SparkLLMClient:
             raise Exception(f"解析星火大模型返回的JSON失败: {e}. 原始文本: {self._full_response}")
         except Exception as e:
             raise Exception(f"处理星火大模型结果失败: {e}")
+        
+    def get_questions(self, resume_text):
+        """
+        向星火大模型发送请求，获取面试评估结果。
+        question_text: 包含所有面试回答的完整转写文本。
+        interview_questions_list: 面试官提出的所有问题列表，用于指导AI评估。
+        """
+        self._full_response = ""
+        self._error_message = None
+        self._is_finished.clear() # 重置信号量
+
+        """使用大模型根据简历内容生成面试问题"""
+        # 限制简历文本长度，避免超出大模型的token限制
+        prompt_content = f"""你是一名专业的HR。根据以下简历内容，生成5个最能考察候选人能力和经历的面试问题。问题应与简历内容紧密相关，同时也可以包含一些通用的行为面试问题。
+        请以JSON数组的格式返回这5个问题。不要包含任何额外的文字、解释或Markdown标记。例如：
+        ["问题1", "问题2", "问题3", "问题4", "问题5"]
+        简历内容：
+        ```
+        {resume_text}
+        ```
+        """
+        
+        # 将Prompt包装成符合API要求的message.text格式
+        question_payload = [
+            {"role": "user", "content": prompt_content}
+        ]
+        
+        request_data = self._gen_params(question_payload)
+
+        ws_url = self._create_url()
+        self._ws = websocket.WebSocketApp(ws_url, 
+                                    on_message=self._on_message, 
+                                    on_error=self._on_error, 
+                                    on_close=self._on_close)
+        
+        # 将请求数据附加到 ws 对象，以便 on_open 能够发送
+        self._ws._question_payload = request_data
+
+        # 在新线程中运行 WebSocket 连接
+        ws_thread = threading.Thread(target=lambda: self._ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE}))
+        ws_thread.daemon = True # 守护线程，主程序退出时自动结束
+        ws_thread.start()
+
+        # 等待连接建立并通过 run 发送初始数据
+        time.sleep(1) # 等待连接建立
+        if not self._error_message and self._ws.sock and self._ws.sock.connected: # 确保连接成功
+            self._ws.send(json.dumps(self._ws._question_payload))
+        else:
+            raise Exception(f"无法建立星火大模型WebSocket连接: {self._error_message}")
+
+
+        # 等待结果或超时
+        if not self._is_finished.wait(timeout=120): # 120秒超时
+            self._ws.close()
+            self._error_message = "星火大模型请求超时。"
+        
+        # 关闭WebSocket连接
+        self._ws.close()
+
+        if self._error_message:
+            raise Exception(self._error_message)
+        
+        try:
+            # 尝试解析完整的JSON响应
+            cleaned_json_str = self._full_response.strip().replace("```json\n", "").replace("```", "").strip()
+            evaluation_result = json.loads(cleaned_json_str)
+            return evaluation_result
+        except json.JSONDecodeError as e:
+            raise Exception(f"解析星火大模型返回的JSON失败: {e}. 原始文本: {self._full_response}")
+        except Exception as e:
+            raise Exception(f"处理星火大模型结果失败: {e}")
+        
+def extract_text_from_pdf(pdf_path):
+    """从PDF文件中提取文本"""
+    try:
+        text = extract_text(pdf_path)
+        return text
+    except Exception as e:
+        print(f"从PDF提取文本失败: {e}")
+        return None
 
 # =====================================================================================
 # 5. FLASK WEB 路由 (保持不变，或根据需求微调)
@@ -348,18 +438,89 @@ def index():
     session.clear()
     return render_template('index.html')
 
+@app.route('/upload_resume', methods=['POST'])
+def upload_resume():
+    """处理简历上传，提取文本，生成面试问题，并重定向到面试页面"""
+    if 'resume_file' not in request.files:
+        return jsonify({"status": "error", "message": "未找到简历文件。"}), 400
+
+    resume_file = request.files['resume_file']
+    if resume_file.filename == '':
+        return jsonify({"status": "error", "message": "未选择文件。"}), 400
+
+    if not resume_file.filename.lower().endswith('.pdf'):
+        return jsonify({"status": "error", "message": "只支持PDF文件。"}), 400
+
+    filename = secure_filename(resume_file.filename)
+    temp_pdf_path = os.path.join(UPLOAD_TEMP_DIR, f"{int(time.time())}_{filename}")
+    resume_file.save(temp_pdf_path)
+    print(f"简历已临时保存到: {temp_pdf_path}")
+
+    resume_text = None
+    try:
+        resume_text = extract_text_from_pdf(temp_pdf_path)
+        if not resume_text or len(resume_text.strip()) < 50: 
+            return jsonify({"status": "error", "message": "无法从PDF中提取有效文本，请确保PDF是文本格式而非扫描图片。"}), 500
+
+        # 将简历文本保存为TXT文件
+        resume_txt_filename = f"resume_{int(time.time())}.txt"
+        resume_txt_filepath = os.path.join(ANSWERS_DIR, resume_txt_filename)
+        with open(resume_txt_filepath, 'w', encoding='utf-8') as f:
+            f.write(resume_text)
+        print(f"简历文本已保存到: {resume_txt_filepath}")
+        session['resume_txt_filepath'] = resume_txt_filepath # 存入session备用
+
+        spark_llm_client_for_questions = SparkLLMClient(
+            appid=SPARK_APPID,
+            api_key=SPARK_API_KEY,
+            api_secret=SPARK_API_SECRET,
+            spark_url=SPARK_URL,
+            domain=SPARK_DOMAIN
+        )
+
+        print("正在调用星火大模型进行简历解析提问...")
+        generated_questions = spark_llm_client_for_questions.get_questions(resume_text)
+
+        if generated_questions:
+            session['generated_questions'] = generated_questions
+            session['job_title'] = request.form.get('job_title', '通用岗位') 
+            print("定制问题生成成功！")
+            return jsonify({"status": "success", "message": "定制问题生成成功，正在跳转...", "redirect_url": url_for('interview')})
+        else:
+            session['generated_questions'] = [
+                "你好，请先用30秒做个简单的自我介绍。",
+                "你为什么对这个岗位感兴趣？",
+                "谈谈你最大的一个优点和缺点。",
+                "你对我们公司有什么了解吗？",
+                "你有什么问题想问我们吗？"
+            ]
+            session['job_title'] = request.form.get('job_title', '通用岗位')
+            print("未能生成定制问题，将使用通用问题。")
+            return jsonify({"status": "warning", "message": "未能生成定制问题，将使用通用问题。", "redirect_url": url_for('interview')})
+
+    except Exception as e:
+        print(f"简历处理或问题生成失败: {e}")
+        return jsonify({"status": "error", "message": f"简历处理失败: {e}"}), 500
+    finally:
+        if os.path.exists(temp_pdf_path):
+            os.remove(temp_pdf_path)
+
 @app.route('/interview')
 def interview():
     job_title = request.args.get('job', '通用岗位')
-    session['questions'] = [
+    
+    questions_to_use = session.get('generated_questions', [
         "你好，请先用30秒做个简单的自我介绍。",
         "你为什么对这个岗位感兴趣？",
         "谈谈你最大的一个优点和缺点。",
         "你对我们公司有什么了解吗？",
         "你有什么问题想问我们吗？"
-    ]
-    session['job_title'] = job_title
-    return render_template('interview.html', job_title=job_title, questions=session['questions'])
+    ])
+    
+    session['questions'] = questions_to_use
+    
+    # 将 job_title 和最终使用的问题列表传递给模板
+    return render_template('interview.html', job_title=job_title, questions=questions_to_use)
 
 @app.route('/result')
 def result():
