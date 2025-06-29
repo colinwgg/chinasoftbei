@@ -19,9 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
-            // <<< 这是最关键的一行代码！
-            // 将获取到的媒体流（包含视频和音频）赋值给 video 元素的 srcObject 属性。
-            // 这样浏览器就会在 <video> 标签内播放摄像头的实时画面。
             videoElement.srcObject = stream;
 
             videoElement.style.display = 'block';
